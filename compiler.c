@@ -36,14 +36,14 @@ const char symbolvalue[][8] = {
     "scanf", "printf", "return"
 };
 const char errormessage[][50] = {
-    "identifier is too long",
-    "invalid character",
-    "there can be only one character in \'",
-    "string is too long",
-    "lack of \"",
-    "lack of \'",
-    "the number is too big",
-    "leading zero is invalid"
+    "identifier is too long", //0
+    "invalid character", //1
+    "there can be only one character in \'", //2
+    "string is too long", //3
+    "lack of \"", //4
+    "lack of \'", //5
+    "the number is too big", //6
+    "leading zero is invalid" //7
 };
 const int nkw = 13; //保留字个数
 const char word[13][8] = { //保留字数组
@@ -168,12 +168,11 @@ int getsym()
         }
         if(k == MAX_DIGIT && isdigit(ch))
         {
-            error(5);
+            error(6);
             while(isdigit(ch))
             {
                 getch();
             }
-            return;
         }
     }
     else
@@ -184,21 +183,51 @@ int getsym()
                         getch();
                         if(isalpha(ch) || isdigit(ch) || ch == '_' ||
                            ch == '+' || ch == '-' || ch == '*' || ch == '/')
-                           c = ch;
+                        {
+                            c = ch;
+                            getch();
+                            if(ch != '\'')
+                            {
+                                //若ch不为' 再读五个字符
+                                //如果读到了' 报错：单引号中只能有一个字符
+                                //如果没读到，报错：缺少单引号
+                                getch();
+                                for(i = 0; i < 5 && ch != '\''; i++)
+                                {
+                                    getch();
+                                }
+                                if(i < 5)
+                                {
+                                    error(2);
+                                    getch();
+                                }
+                                else
+                                {
+                                    error(5);//缺少单引号
+                                    while(isalpha(ch) || isdigit(ch) || ch == '_' || ch == '+' || 
+                                        ch == '-' || ch == '*' || ch == '/' || ch == '\'')//略去其他字符
+                                    {
+                                        getch();
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                getch();
+                            }
+                        }
                         else
                         {
                             error(1);
-                            return;
+                            while(isalpha(ch) || isdigit(ch) || ch == '_' || ch == '+' || 
+                                ch == '-' || ch == '*' || ch == '/' || ch == '\'')//略去其他字符
+                            {
+                                getch();
+                            }
                         }
-                        getch();
-                        if(ch != '\'')
-                        {
-                            error(2);
-                            return;
-                        }
-                        getch();
                 break;
-            case '\"':  getch();
+            case '\"':  sym = stringcon;
+                        getch();
                         k = 0;
                         while(k < STRLNGMAX && ch != '\"' && ch >= 32 && ch <= 126)
                         {
@@ -209,16 +238,24 @@ int getsym()
                         if(k == STRLNGMAX && ch != '\"' && ch >= 32 && ch <= 126) //字符串超长
                         {
                             error(3);
-                            return;
+                            getch();
+                            while(ch >= 32 && ch <= 126)
+                                getch();
                         }
-                        if(ch == '\"')
-                            sym = stringcon;
                         else
                         {
-                            error(4);
-                            return;
+                            if(ch != '\"')
+                            {
+                                error(4);
+                                getch();
+                                while(ch >= 32 && ch <= 126)
+                                    getch();
+                            }
+                            else//ch为"
+                            {
+                                getch();
+                            }
                         }
-                        getch();
                 break;
             case '=' :  getch();
                         if(ch == '=')
@@ -273,6 +310,7 @@ int getsym()
                         }
                         else
                         {
+                            sym = notsy;
                             error(1);
                         }
                 break;
