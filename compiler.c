@@ -72,8 +72,8 @@ void getch()//获取一个字符
     {
         if(feof(fin))
         {
+            ch = -1;
             printf("program incomplete\n");
-            fclose(fin);
             return;
         }
         ll = 0;
@@ -81,6 +81,7 @@ void getch()//获取一个字符
         memset(line, 0, MAX_LINE);
         if(fgets(line, MAX_LINE, fin))
         {
+            l++;
             if(line[strlen(line)] == '\n')
                 line[strlen(line)] = '\0';
             ll = strlen(line);
@@ -102,10 +103,9 @@ int getsym()
 {
     int k, i, j;
     char a[ILNGMAX+1];
+    getch();
     while(ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r')
         getch();
-    if(feof(fin))
-        return -1;
     if(isalpha(ch) || ch == '_')
     {
         for(k = 0; k < ILNGMAX && (isalpha(ch) || isdigit(ch) || ch == '_'); k++)
@@ -114,6 +114,7 @@ int getsym()
             getch();
         }
         a[k] = '\0';
+        strcpy(id, a);
         if(k == ILNGMAX && (isalpha(ch) || isdigit(ch) || ch == '_'))//标识符超长
         {
             error(0);
@@ -122,7 +123,6 @@ int getsym()
                 getch();
             }
         }
-        strcpy(id, a);
         i = 0;
         j = nkw - 1;
         while(i <= j)
@@ -204,7 +204,7 @@ int getsym()
                                 else
                                 {
                                     error(5);//缺少单引号
-                                    while(isalpha(ch) || isdigit(ch) || ch == '_' || ch == '+' || 
+                                    while(isalpha(ch) || isdigit(ch) || ch == '_' || ch == '+' ||
                                         ch == '-' || ch == '*' || ch == '/' || ch == '\'')//略去其他字符
                                     {
                                         getch();
@@ -219,7 +219,7 @@ int getsym()
                         else
                         {
                             error(1);
-                            while(isalpha(ch) || isdigit(ch) || ch == '_' || ch == '+' || 
+                            while(isalpha(ch) || isdigit(ch) || ch == '_' || ch == '+' ||
                                 ch == '-' || ch == '*' || ch == '/' || ch == '\'')//略去其他字符
                             {
                                 getch();
@@ -338,6 +338,8 @@ int getsym()
             case ',' :  sym = comma;
                         getch();
                 break;
+            case -1:
+                break;
             default:    sym = notsy;
                         error(1);
         }
@@ -368,7 +370,6 @@ void parameterlist()//处理函数参数，将形参及其有关信息登录到�
 {
 
 }
-void 
 void print(int n)
 {
     printf("%d %s ", n, symbolstr[sym]);
@@ -400,8 +401,9 @@ int main()
     }
     printf("Open successfully!\n");
 
-    cc = 0;
-    l = 1;
+    cc = -1;
+    ll = 1;
+    l = 0;
     i = 1;
     getch();
     while(!feof(fin))
