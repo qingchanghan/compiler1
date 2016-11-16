@@ -1,6 +1,5 @@
-const int MAX = 30, MIN = 1;
-const char _CH1 = '+';
-01
+const int MAX = 10, MIN = 1;
+const char _CH1 = '++';
 int gbinta[100], gbi;
 char gbchara[5], gbc;
 

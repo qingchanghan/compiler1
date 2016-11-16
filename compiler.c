@@ -1,10 +1,11 @@
 #include<stdio.h>
 #include<ctype.h>
 #include<string.h>
-#define ILNGMAX 30 //æ ‡è¯†ç¬¦é•¿åº¦æœ€å¤§å€¼
-#define STRLNGMAX 100 //å­—ç¬¦ä¸²é•¿åº¦æœ€å¤§å€¼
-#define MAX_DIGIT 9 //intæœ€å¤§ä½æ•°
-#define MAX_LINE 200 //æœ€å¤§è¡Œé•¿åº¦
+#define ILNGMAX 30 //±êÊ¶·û³¤¶È×î´óÖµ
+#define STRLNGMAX 100 //×Ö·û´®³¤¶È×î´óÖµ
+#define MAX_DIGIT 9 //int×î´óÎ»Êý
+#define MAX_LINE 200 //×î´óÐÐ³¤¶È
+#define MAX_TAB 2000//±íÏî×î´óÖµ
 enum symbol{
     notsy, plus, minus, times, div, becomes,
     eql, neq, gtr, geq, lss, leq,
@@ -13,8 +14,15 @@ enum symbol{
     ident,
     constsy, intsy, charsy, voidsy, mainsy,
     ifsy, elsesy, dosy, whilesy, forsy,
-    scanfsy, printfsy, returnsy
-}; //æžšä¸¾ç±»åž‹
+    scanfsy, printfsy, returnsy,
+    end
+}; //Ã¶¾ÙÀàÐÍ
+enum obj{
+    constant, variable, function
+}; //±êÊ¶·ûÖÖÀà
+enum type{
+    inttype, chartype, arraytype
+}; //±êÊ¶·ûÀàÐÍ
 const char symbolstr[][12] = {
     "notsy", "plus", "minus", "times", "div", "becomes",
     "eql", "neq", "gtr", "geq", "lss", "leq",
@@ -23,8 +31,9 @@ const char symbolstr[][12] = {
     "ident",
     "constsy", "intsy", "charsy", "voidsy", "mainsy",
     "ifsy", "elsesy", "dosy", "whilesy", "forsy",
-    "scanfsy", "printfsy", "returnsy"
-}; //æžšä¸¾ç±»åž‹
+    "scanfsy", "printfsy", "returnsy",
+    "end"
+}; //Ã¶¾ÙÀàÐÍ
 const char symbolvalue[][8] = {
     "", "+", "-", "*", "/", "=",
     "==", "!=", ">", ">=", "<", "<=",
@@ -33,40 +42,100 @@ const char symbolvalue[][8] = {
     "",
     "const", "int", "char", "void", "main",
     "if", "else", "do", "while", "for",
-    "scanf", "printf", "return"
+    "scanf", "printf", "return",
+    "end"
 };
 const char errormessage[][50] = {
-    "identifier is too long", //0
-    "invalid character", //1
-    "there can be only one character in \'", //2
-    "string is too long", //3
-    "lack of \"", //4
-    "lack of \'", //5
-    "the number is too big", //6
-    "leading zero is invalid" //7
+    "±êÊ¶·û¹ý³¤", //0
+    "²»ºÏ·¨×Ö·û", //1
+    "µ¥ÒýºÅÖÐÖ»ÄÜÓÐÒ»¸ö×Ö·û", //2
+    "×Ö·û´®¹ý³¤", //3
+    "È±ÉÙ\"", //4
+    "È±ÉÙ'", //5
+    "ÕûÊý¹ý´ó", //6
+    "Ç°µ¼0²»ºÏ·¨", //7
+    "Ó¦Îªint³£Á¿", //8
+    "constºóÖ»ÄÜ¸úint»òchar", //9
+    "int»òcharºóÓ¦Îª±êÊ¶·û", //10
+    "³£Á¿ËµÃ÷ÖÐint»òcharºóÓ¦Îª¸³ÖµºÅ", //11
+    "Ó¦Îª','»ò';'", //12
+    "Ó¦Îª×Ö·û³£Á¿", //13
+    "int + ±êÊ¶·ûºóÓ¦Îª'['¡¢','¡¢';'»ò'('", //14
 };
-const int nkw = 13; //ä¿ç•™å­—ä¸ªæ•°
-const char word[13][8] = { //ä¿ç•™å­—æ•°ç»„
+struct table{
+    char name[ILNGMAX+1];
+    int link;
+    enum obj obj;
+    enum type typ;
+    int ref;
+    int adr;
+}tab[MAX_TAB];
+int t;//·ûºÅ±ítabË÷Òý
+const int nkw = 13; //±£Áô×Ö¸öÊý
+const char word[13][8] = { //±£Áô×ÖÊý×é
     "char", "const", "do", "else", "for", "if", "int",
     "main", "printf", "return", "scanf", "void", "while",
 };
-enum symbol wsym[13] = {//ä¿ç•™å­—å¯¹åº”ç±»åž‹
+enum symbol wsym[13] = {//±£Áô×Ö¶ÔÓ¦ÀàÐÍ
     charsy, constsy, dosy, elsesy, forsy, ifsy, intsy,
     mainsy, printfsy, returnsy, scanfsy, voidsy, whilesy
 };
-FILE *fin; //è¾“å…¥æ–‡ä»¶æŒ‡é’ˆ
-char ch; //å½“å‰æ‰€è¯»å­—ç¬¦
-int cc; //å½“å‰æ‰€å–å­—ç¬¦åœ¨è¯¥è¡Œçš„ä½ç½®
-char line[MAX_LINE]; //å½“å‰è¡Œ
-int ll; //å½“å‰è¡Œé•¿åº¦
-int l; //å½“å‰æ‰€å–å­—ç¬¦æ‰€åœ¨è¡Œæ•°
-enum symbol sym; //è¯†åˆ«åˆ°çš„å•è¯ç±»åž‹
-int inum; //è¯†åˆ«åˆ°çš„æ•°å­—
-char c; //è¯†åˆ«åˆ°çš„å­—ç¬¦
-char id[ILNGMAX+1]; //è¯†åˆ«åˆ°çš„æ ‡è¯†ç¬¦
-char string[STRLNGMAX+1]; //è¯†åˆ«åˆ°çš„å­—ç¬¦ä¸²
+FILE *fin; //ÊäÈëÎÄ¼þÖ¸Õë
+char ch; //µ±Ç°Ëù¶Á×Ö·û
+int cc; //µ±Ç°ËùÈ¡×Ö·ûÔÚ¸ÃÐÐµÄÎ»ÖÃ
+char line[MAX_LINE]; //µ±Ç°ÐÐ
+int ll; //µ±Ç°ÐÐ³¤¶È
+int l; //µ±Ç°ËùÈ¡×Ö·ûËùÔÚÐÐÊý
+enum symbol sym; //Ê¶±ðµ½µÄµ¥´ÊÀàÐÍ
+int inum; //Ê¶±ðµ½µÄÊý×Ö
+char c; //Ê¶±ðµ½µÄ×Ö·û
+char id[ILNGMAX+1]; //Ê¶±ðµ½µÄ±êÊ¶·û
+char string[STRLNGMAX+1]; //Ê¶±ðµ½µÄ×Ö·û´®
+enum symbol lastsy;
+char lastid[ILNGMAX+1];
 
-void getch()//èŽ·å–ä¸€ä¸ªå­—ç¬¦
+//º¯ÊýÉùÃ÷
+void getch();//»ñÈ¡Ò»¸ö×Ö·û
+void error(int n);//error¶¼Ö±½ÓreturnÁË£¬ÕâÀïÓ¦¸ÃÔÙ¶ÁÒ»¸ö×Ö·û
+void getsym();
+void program();//´¦Àí×Ü³ÌÐò
+void constdec();//´¦Àí³£Á¿ÉùÃ÷²¿·Ö
+void print(int n);
+
+
+int main()
+{
+    int i;
+    char sin[FILENAME_MAX];
+    printf("please input source program file name : \n");
+    scanf("%s", sin);
+    fin = fopen(sin, "r");
+    if(fin == NULL)
+    {
+        printf("Failed to open!\n");
+        return 1;
+    }
+    printf("Open successfully!\n");
+
+    cc = -1;
+    ll = 0;
+    l = 0;
+    i = 1;
+    t = 0;
+    getch();
+    /*while(!feof(fin))
+    {
+        getsym();
+        if(ch == -1)
+            break;
+        print(i++);
+    }*/
+    program();
+
+    fclose(fin);
+}
+
+void getch()//»ñÈ¡Ò»¸ö×Ö·û
 {
     if(cc == ll - 1)
     {
@@ -82,9 +151,9 @@ void getch()//èŽ·å–ä¸€ä¸ªå­—ç¬¦
         if(fgets(line, MAX_LINE, fin))
         {
             l++;
-            if(line[strlen(line)] == '\n')
-                line[strlen(line)] = '\0';
             ll = strlen(line);
+            if(line[ll] == '\n')
+                line[ll--] = '\0';
         }
         else
         {
@@ -95,17 +164,21 @@ void getch()//èŽ·å–ä¸€ä¸ªå­—ç¬¦
     cc++;
     ch = line[cc];
 }
-void error(int n)//erroréƒ½ç›´æŽ¥returnäº†ï¼Œè¿™é‡Œåº”è¯¥å†è¯»ä¸€ä¸ªå­—ç¬¦
+void error(int n)//error¶¼Ö±½ÓreturnÁË£¬ÕâÀïÓ¦¸ÃÔÙ¶ÁÒ»¸ö×Ö·û
 {
-    printf("Error %d! Message: %s in line%d.%d\n", n, errormessage[n], l, cc);
+    printf("Error %d! ´íÎóÐÅÏ¢: %s in line%d.%d\n", n, errormessage[n], l, cc);
 }
-int getsym()
+void getsym()
 {
     int k, i, j;
     char a[ILNGMAX+1];
-    getch();
     while(ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r')
         getch();
+    if(ch == -1)
+    {
+        sym = end;
+        return;
+    }
     if(isalpha(ch) || ch == '_')
     {
         for(k = 0; k < ILNGMAX && (isalpha(ch) || isdigit(ch) || ch == '_'); k++)
@@ -115,7 +188,7 @@ int getsym()
         }
         a[k] = '\0';
         strcpy(id, a);
-        if(k == ILNGMAX && (isalpha(ch) || isdigit(ch) || ch == '_'))//æ ‡è¯†ç¬¦è¶…é•¿
+        if(k == ILNGMAX && (isalpha(ch) || isdigit(ch) || ch == '_'))//±êÊ¶·û³¬³¤
         {
             error(0);
             while(isalpha(ch) || isdigit(ch) || ch == '_')
@@ -188,9 +261,9 @@ int getsym()
                             getch();
                             if(ch != '\'')
                             {
-                                //è‹¥chä¸ä¸º' å†è¯»äº”ä¸ªå­—ç¬¦
-                                //å¦‚æžœè¯»åˆ°äº†' æŠ¥é”™ï¼šå•å¼•å·ä¸­åªèƒ½æœ‰ä¸€ä¸ªå­—ç¬¦
-                                //å¦‚æžœæ²¡è¯»åˆ°ï¼ŒæŠ¥é”™ï¼šç¼ºå°‘å•å¼•å·
+                                //Èôch²»Îª' ÔÙ¶ÁÎå¸ö×Ö·û
+                                //Èç¹û¶Áµ½ÁË' ±¨´í£ºµ¥ÒýºÅÖÐÖ»ÄÜÓÐÒ»¸ö×Ö·û
+                                //Èç¹ûÃ»¶Áµ½£¬±¨´í£ºÈ±ÉÙµ¥ÒýºÅ
                                 getch();
                                 for(i = 0; i < 5 && ch != '\''; i++)
                                 {
@@ -203,9 +276,9 @@ int getsym()
                                 }
                                 else
                                 {
-                                    error(5);//ç¼ºå°‘å•å¼•å·
+                                    error(5);//È±ÉÙµ¥ÒýºÅ
                                     while(isalpha(ch) || isdigit(ch) || ch == '_' || ch == '+' ||
-                                        ch == '-' || ch == '*' || ch == '/' || ch == '\'')//ç•¥åŽ»å…¶ä»–å­—ç¬¦
+                                        ch == '-' || ch == '*' || ch == '/' || ch == '\'')//ÂÔÈ¥ÆäËû×Ö·û
                                     {
                                         getch();
                                     }
@@ -220,7 +293,7 @@ int getsym()
                         {
                             error(1);
                             while(isalpha(ch) || isdigit(ch) || ch == '_' || ch == '+' ||
-                                ch == '-' || ch == '*' || ch == '/' || ch == '\'')//ç•¥åŽ»å…¶ä»–å­—ç¬¦
+                                ch == '-' || ch == '*' || ch == '/' || ch == '\'')//ÂÔÈ¥ÆäËû×Ö·û
                             {
                                 getch();
                             }
@@ -235,7 +308,7 @@ int getsym()
                             getch();
                         }
                         string[k] = '\0';
-                        if(k == STRLNGMAX && ch != '\"' && ch >= 32 && ch <= 126) //å­—ç¬¦ä¸²è¶…é•¿
+                        if(k == STRLNGMAX && ch != '\"' && ch >= 32 && ch <= 126) //×Ö·û´®³¬³¤
                         {
                             error(3);
                             getch();
@@ -251,7 +324,7 @@ int getsym()
                                 while(ch >= 32 && ch <= 126)
                                     getch();
                             }
-                            else//chä¸º"
+                            else//chÎª"
                             {
                                 getch();
                             }
@@ -344,29 +417,229 @@ int getsym()
                         error(1);
         }
     }
-    return 0;
+    return ;
 }
-void program()//å¤„ç†æ€»ç¨‹åº
+void program()//´¦Àí×Ü³ÌÐò
+{
+    getsym();
+    if(sym == constsy)
+    {
+        constdec();
+    }
+    printf("³£Á¿ÉùÃ÷²¿·Ö´¦ÀíÍê±Ï\n");
+    while(sym == intsy || sym == charsy)
+    {
+        lastsy = sym;
+        getsym();
+        if(sym != ident)
+        {
+            error(10);
+            while(sym != semicolon && sym != comma && sym != end)
+                getsym();
+            getsym();
+            continue;
+        }
+        strcpy(lastid, id);
+        getsym();
+        if(sym == comma || sym == semicolon || sym == lbrack)
+        {
+            //±äÁ¿ÉùÃ÷
+            variabledec();
+        }
+        else if(sym == lparent)
+        {
+            returnfctdec();
+        }
+        else
+        {
+            //ÕâÀïµÄ´íÎó´¦ÀíÔÝÊ±Ã»ÓÐË¼Â·£¬ÔÝÊ±Ö±½Ó½áÊø
+            error(14);
+            printf("¶Áµ½ÎÞ·¨ºÏÀíÌø¶ÁµÄ´íÎó£¬³ÌÐò½áÊø\n");
+            return;
+        }
+    }
+    while(sym == voidsy)
+    {
+
+    }
+    if(sym == end)
+    {
+        printf("µ½´ïÎÄ¼þ½áÎ²\n");
+    }
+    else
+    {
+        printf("Î´´¦ÀíÍê£¬·¢Éú´íÎó\n");
+    }
+}
+void constdec()//´¦Àí³£Á¿ÉùÃ÷²¿·Ö
+{
+    do{
+        getsym();
+        if(sym != intsy && sym != charsy)
+        {
+            error(9);
+            while(sym != semicolon && sym != end)
+                getsym();
+            getsym();
+        }
+        else
+        {
+            if(sym == intsy)
+            {
+                do{
+                    getsym();
+                    if(sym != ident)
+                    {
+                        error(10);
+                        while(sym != semicolon && sym != comma && sym != end)
+                            getsym();
+                    }
+                    else
+                    {
+                        getsym();
+                        if(sym != becomes)
+                        {
+                            error(11);
+                            while(sym != semicolon && sym != comma && sym != end)
+                                getsym();
+                        }
+                        else
+                        {
+                            getsym();
+                            if(sym != intcon)
+                            {
+                                error(8);
+                                getsym();
+                            }
+                            else
+                            {
+                                //³£Á¿µÇÂ¼·ûºÅ±í
+                                strcpy(tab[t].name, id);
+                                if(t == 0)
+                                    tab[t].link = 0;
+                                else
+                                    tab[t].link = t - 1;
+                                tab[t].obj = constant;
+                                tab[t].typ = inttype;
+                                tab[t].ref = 0;
+                                tab[t].adr = inum;
+                                printf("³£Á¿ÉùÃ÷Óï¾ä£ºconst int %s = %d;\n", tab[t].name, tab[t].adr);
+                                t++;
+                                getsym();
+                            }
+                        }
+                    }
+                    if(sym == semicolon)
+                    {
+                        break;
+                    }
+                    else if(sym != comma)
+                    {
+                        error(12);
+                        while(sym != semicolon && sym != end)
+                            getsym();
+                        break;
+                    }
+                }while(1);
+                getsym();
+            }
+            else if(sym == charsy)
+            {
+                do{
+                    getsym();
+                    if(sym != ident)
+                    {
+                        error(10);
+                        while(sym != semicolon && sym != comma && sym != end)
+                            getsym();
+                    }
+                    else
+                    {
+                        getsym();
+                        if(sym != becomes)
+                        {
+                            error(11);
+                            while(sym != semicolon && sym != comma && sym != end)
+                                getsym();
+                        }
+                        else
+                        {
+                            getsym();
+                            if(sym != charcon)
+                            {
+                                error(13);
+                                getsym();
+                            }
+                            else
+                            {
+                                //³£Á¿µÇÂ¼·ûºÅ±í
+                                strcpy(tab[t].name, id);
+                                if(t == 0)
+                                    tab[t].link = 0;
+                                else
+                                    tab[t].link = t - 1;
+                                tab[t].obj = constant;
+                                tab[t].typ = chartype;
+                                tab[t].ref = 0;
+                                tab[t].adr = c;
+                                printf("³£Á¿ÉùÃ÷Óï¾ä£ºconst char %s = '%c';\n", tab[t].name, tab[t].adr);
+                                t++;
+                                getsym();
+                            }
+                        }
+                    }
+                    if(sym == semicolon)
+                    {
+                        break;
+                    }
+                    else if(sym != comma)
+                    {
+                        error(12);
+                        while(sym != semicolon && sym != end)
+                            getsym();
+                        break;
+                    }
+                }while(1);
+                getsym();
+            }
+        }
+        if(sym != constsy)
+        {
+            break;
+        }
+    }while(1);
+}
+void variabledec()//´¦Àí±äÁ¿ÉùÃ÷²¿·Ö
+{
+    if(sym == lbrack)
+    {
+        getsym();
+        if(sym != intcon)
+        {
+            error(8);
+            while(sym != comma && sym != semicolon && sym != end)
+                getsym();
+        }
+        else
+        {
+            getsym();
+            if(sym != rbrack)
+            {
+                error();
+            }
+            printf("±äÁ¿ÉùÃ÷Óï¾ä£º%s %s[%d];", symbolvalue[lastsy], lastid, inum);
+        }
+    }
+}
+void returnfctdec()//´¦ÀíÓÐ·µ»ØÖµº¯Êý¶¨Òå
 {
 
 }
-void constdec()//å¤„ç†å¸¸é‡å£°æ˜Žéƒ¨åˆ†
+void noreturnfctdec()//´¦ÀíÎÞ·µ»ØÖµº¯Êý¶¨Òå
 {
 
 }
-void variabledec()//å¤„ç†å˜é‡å£°æ˜Žéƒ¨åˆ†
-{
-
-}
-void returnfctdec()//å¤„ç†æœ‰è¿”å›žå€¼å‡½æ•°å®šä¹‰
-{
-
-}
-void noreturnfctdec()//å¤„ç†æ— è¿”å›žå€¼å‡½æ•°å®šä¹‰
-{
-
-}
-void parameterlist()//å¤„ç†å‡½æ•°å‚æ•°ï¼Œå°†å½¢å‚åŠå…¶æœ‰å…³ä¿¡æ¯ç™»å½•åˆ°ç¬¦å·è¡¨ä¸­
+void parameterlist()//´¦Àíº¯Êý²ÎÊý£¬½«ÐÎ²Î¼°ÆäÓÐ¹ØÐÅÏ¢µÇÂ¼µ½·ûºÅ±íÖÐ
 {
 
 }
@@ -379,39 +652,11 @@ void print(int n)
             break;
         case charcon:printf("%c", c);
             break;
-        case stringcon:printf("%s", string);
+        case stringcon:printf("\"%s\"", string);
             break;
         case ident: printf("%s", id);
             break;
         default: printf("%s", symbolvalue[sym]);
     }
     putchar('\n');
-}
-int main()
-{
-    int i;
-    char sin[FILENAME_MAX];
-    printf("please input source program file name : \n");
-    scanf("%s", sin);
-    fin = fopen(sin, "r");
-    if(fin == NULL)
-    {
-        printf("Failed to open!\n");
-        return 1;
-    }
-    printf("Open successfully!\n");
-
-    cc = -1;
-    ll = 1;
-    l = 0;
-    i = 1;
-    getch();
-    while(!feof(fin))
-    {
-        getsym();
-        if(ch == -1)
-            break;
-        print(i++);
-    }
-    fclose(fin);
 }
