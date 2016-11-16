@@ -1,5 +1,5 @@
 const int MAX = 10, MIN = 1;
-const char _CH1 = '++';
+const char _CH1 = '+';
 int gbinta[100], gbi;
 char gbchara[5], gbc;
 
@@ -22,7 +22,7 @@ int fun1(int n)
 	{
 		return (fun1(n+1)+n);
 	}
-	return n;
+	return (n);
 }
 void fun2()
 {
@@ -43,7 +43,7 @@ char fun3()
 
 void main()
 {
-	const M_MAX = 20, M_MIN = 10;
+	const int M_MAX = 20, M_MIN = 10;
 	int n1, n2, n3, n4;
 	char c1, c2, c3, c4, c5, C1;
 	int inta[100];

@@ -55,12 +55,28 @@ const char errormessage[][50] = {
     "整数过大", //6
     "前导0不合法", //7
     "应为int常量", //8
-    "const后只能跟int或char", //9
-    "int或char后应为标识符", //10
+    "应为int或char", //9
+    "应为标识符", //10
     "常量说明中int或char后应为赋值号", //11
     "应为','或';'", //12
     "应为字符常量", //13
-    "int + 标识符后应为'['、','、';'或'('", //14
+    "int后的标识符后应为'['、','、';'或'('", //14
+    "应为']'", //15
+    "void后应为main或函数名", //16
+    "应为')'", //17
+    "应为'{'", //18
+    "int后的标识符后应为'['、','或';'", //19
+    "应为'}'", //20
+    "应为'='、'['或'('", //21
+    "应为'('", //22
+    "因子格式错误", //23
+    "应为while", //24
+    "应为=", //25
+    "应为;", //26
+    "应为+或-", //27
+    "应为[", //28
+    "应为,或)", //29
+    "应为(或;", //30
 };
 struct table{
     char name[ILNGMAX+1];
@@ -100,6 +116,29 @@ void error(int n);//error都直接return了，这里应该再读一个字符
 void getsym();
 void program();//处理总程序
 void constdec();//处理常量声明部分
+void variabledec();
+void returnfctdec();
+void noreturnfctdec();
+void parameterlist();
+void maindec();
+void compoundstatement();
+void statementlist();
+void statement();
+void ifstatement();
+void dostatement();
+void forstatement();
+void condition();
+void assignment();
+void readstatement();
+void writestatement();
+void returnstatement();
+void returnfctstatement();
+void noreturnfctstatement();
+void valueparalist();
+void expression();
+void term();
+void factor();
+
 void print(int n);
 
 
@@ -142,7 +181,6 @@ void getch()//获取一个字符
         if(feof(fin))
         {
             ch = -1;
-            printf("program incomplete\n");
             return;
         }
         ll = 0;
@@ -166,7 +204,7 @@ void getch()//获取一个字符
 }
 void error(int n)//error都直接return了，这里应该再读一个字符
 {
-    printf("Error %d! 错误信息: %s in line%d.%d\n", n, errormessage[n], l, cc);
+    printf("Error%d in line%d.%d 错误信息：%s\n", n, l, cc, errormessage[n]);
 }
 void getsym()
 {
@@ -426,49 +464,139 @@ void program()//处理总程序
     {
         constdec();
     }
-    printf("常量声明部分处理完毕\n");
-    while(sym == intsy || sym == charsy)
+    printf("line%d.%d 全局常量声明部分处理完毕\n", l, cc);
+    while(sym == intsy || sym == charsy || sym == voidsy)
     {
-        lastsy = sym;
-        getsym();
-        if(sym != ident)
+        if(sym == intsy || sym == charsy)
         {
-            error(10);
-            while(sym != semicolon && sym != comma && sym != end)
-                getsym();
+            lastsy = sym;
             getsym();
-            continue;
+            while(sym != ident)
+            {
+                error(10);
+                while(sym != semicolon && sym != comma && sym != end)
+                    getsym();
+                if(sym == semicolon)
+                {
+                    break;
+                }
+                else if(sym == comma)
+                {
+                    getsym();
+                }
+                else if(sym == end)
+                    break;
+            }
+            if(sym == semicolon)
+            {
+                getsym();
+                continue;
+            }
+            else if(sym == end)
+            {
+                break;
+            }
+            strcpy(lastid, id);
+            getsym();
+            if(sym == comma || sym == semicolon || sym == lbrack)
+            {
+                //变量声明
+                variabledec();
+            }
+            else if(sym == lparent)
+            {
+                returnfctdec();
+                getsym();
+                break;
+            }
+            else
+            {
+                //这里的错误处理暂时没有思路，暂时直接结束
+                error(14);
+                printf("line%d.%d 遇到无法合理跳读的错误，程序结束\n", l, cc);
+                return;
+            }
         }
-        strcpy(lastid, id);
-        getsym();
-        if(sym == comma || sym == semicolon || sym == lbrack)
+        else if(sym == voidsy)
         {
-            //变量声明
-            variabledec();
+            getsym();
+            if(sym == mainsy)//主函数
+            {
+                maindec();
+                printf("line%d.%d 语法分析完成\n", l, cc);
+                return;
+            }
+            else if(sym == ident)//无返回值函数
+            {
+                getsym();
+                if(sym != lparent)
+                {
+                    error(22);
+                }
+                noreturnfctdec();
+                getsym();
+                break;
+            }
+            else
+            {
+                error(16);
+                printf("line%d.%d 遇到无法合理跳读的错误，程序结束\n", l, cc);
+                return;
+            }
         }
-        else if(sym == lparent)
+    }
+    while(sym == intsy || sym == charsy || sym == voidsy)
+    {
+        if(sym == intsy || sym == charsy)
         {
+            lastsy = sym;
+            getsym();
+            if(sym != ident)
+            {
+                error(10);
+            }
+            getsym();
+            if(sym != lparent)
+            {
+                error(22);
+            }
             returnfctdec();
+            getsym();
         }
         else
         {
-            //这里的错误处理暂时没有思路，暂时直接结束
-            error(14);
-            printf("读到无法合理跳读的错误，程序结束\n");
-            return;
+            getsym();
+            if(sym == mainsy)//主函数
+            {
+                maindec();
+                printf("line%d.%d 语法分析完成\n", l, cc);
+                return;
+            }
+            else if(sym == ident)//无返回值函数
+            {
+                getsym();
+                if(sym != lparent)
+                {
+                    error(22);
+                }
+                noreturnfctdec();
+                getsym();
+            }
+            else
+            {
+                error(16);
+                printf("line%d.%d 遇到无法合理跳读的错误，程序结束\n", l, cc);
+                return;
+            }
         }
-    }
-    while(sym == voidsy)
-    {
-
     }
     if(sym == end)
     {
-        printf("到达文件结尾\n");
+        printf("line%d.%d 到达文件结尾\n", l, cc);
     }
     else
     {
-        printf("未处理完，发生错误\n");
+        printf("line%d.%d 未处理完，发生错误\n", l, cc);
     }
 }
 void constdec()//处理常量声明部分
@@ -523,7 +651,7 @@ void constdec()//处理常量声明部分
                                 tab[t].typ = inttype;
                                 tab[t].ref = 0;
                                 tab[t].adr = inum;
-                                printf("常量声明语句：const int %s = %d;\n", tab[t].name, tab[t].adr);
+                                printf("line%d.%d 常量声明语句：const int %s = %d;\n", l, cc, tab[t].name, tab[t].adr);
                                 t++;
                                 getsym();
                             }
@@ -582,7 +710,7 @@ void constdec()//处理常量声明部分
                                 tab[t].typ = chartype;
                                 tab[t].ref = 0;
                                 tab[t].adr = c;
-                                printf("常量声明语句：const char %s = '%c';\n", tab[t].name, tab[t].adr);
+                                printf("line%d.%d 常量声明语句：const char %s = '%c';\n", l, cc, tab[t].name, tab[t].adr);
                                 t++;
                                 getsym();
                             }
@@ -609,7 +737,7 @@ void constdec()//处理常量声明部分
         }
     }while(1);
 }
-void variabledec()//处理变量声明部分
+void variabledec()//处理变量声明部分 TODO:还没有登录符号表
 {
     if(sym == lbrack)
     {
@@ -625,24 +753,658 @@ void variabledec()//处理变量声明部分
             getsym();
             if(sym != rbrack)
             {
-                error();
+                error(15);
             }
-            printf("变量声明语句：%s %s[%d];", symbolvalue[lastsy], lastid, inum);
+            printf("line%d.%d 变量声明语句：%s %s[%d];\n", l, cc, symbolvalue[lastsy], lastid, inum);
+            getsym();
         }
+    }
+    else
+    {
+        printf("line%d.%d 变量声明语句：%s %s;\n", l, cc, symbolvalue[lastsy], lastid);
+    }
+    while(sym == comma)
+    {
+        getsym();
+        if(sym == ident)
+        {
+            getsym();
+            if(sym == lbrack)
+            {
+                getsym();
+                if(sym != intcon)
+                {
+                    error(8);
+                    while(sym != comma && sym != semicolon && sym != end)
+                        getsym();
+                }
+                else
+                {
+                    getsym();
+                    if(sym != rbrack)
+                    {
+                        error(15);
+                    }
+                    printf("line%d.%d 变量声明语句：%s %s[%d];\n", l, cc, symbolvalue[lastsy], id, inum);
+                    getsym();
+                }
+            }
+            else
+            {
+                printf("line%d.%d 变量声明语句：%s %s;\n", l, cc, symbolvalue[lastsy], id);
+            }
+        }
+        else
+        {
+            error(10);
+            while(sym != comma && sym != semicolon && sym != end)
+                getsym();
+        }
+    }
+    if(sym == semicolon)
+    {
+        getsym();
+        return;
+    }
+    else
+    {
+        error(16);
+        while(sym != comma && sym != semicolon && sym != end)
+            getsym();
+        getsym();
     }
 }
 void returnfctdec()//处理有返回值函数定义
 {
-
+    printf("line%d.%d 有返回值函数定义分析开始\n", l, cc);
+    parameterlist();
+    compoundstatement();
+    printf("line%d.%d 有返回值函数定义分析完成\n", l, cc);
 }
 void noreturnfctdec()//处理无返回值函数定义
 {
-
+    printf("line%d.%d 无返回值函数定义分析开始\n", l, cc);
+    parameterlist();
+    compoundstatement();
+    printf("line%d.%d 无返回值函数定义分析完成\n", l, cc);
 }
 void parameterlist()//处理函数参数，将形参及其有关信息登录到符号表中
 {
-
+    int i = 0;
+    do{
+        getsym();
+        if(i == 0 && sym == rparent)
+            break;
+        if(sym == charsy || sym == intsy)
+        {
+            lastsy = sym;
+            getsym();
+            if(sym == ident)
+            {
+                printf("line%d.%d 函数参数：%s %s\n", l, cc, symbolvalue[lastsy], id);
+                getsym();
+            }
+            else
+            {
+                error(10);
+                while(sym != comma && sym != rparent && sym != end)
+                    getsym();
+            }
+        }
+        else
+        {
+            error(9);
+            while(sym != comma && sym != rparent && sym != end)
+                getsym();
+        }
+        i++;
+    }while(sym == comma);
+    if(sym == rparent)
+    {
+        printf("line%d.%d 参数表处理完成，共有%d个参数\n", l, cc, i);
+    }
+    else
+    {
+        error(17);
+    }
 }
+void maindec()
+{
+    getsym();
+    if(sym != lparent)
+    {
+        error(22);
+    }
+    getsym();
+    if(sym != rparent)
+    {
+        error(17);
+    }
+    compoundstatement();
+    printf("line%d.%d main函数分析完成\n", l, cc);
+}
+void compoundstatement()
+{
+    getsym();
+    if(sym != lbrace)
+    {
+        error(18);
+    }
+    getsym();
+    if(sym == constsy)
+    {
+        constdec();
+    }
+    printf("line%d.%d 函数中常量声明部分处理完毕\n", l, cc);
+    while(sym == intsy || sym == charsy)
+    {
+        lastsy = sym;
+        getsym();
+        while(sym != ident)
+        {
+            error(10);
+            while(sym != semicolon && sym != comma && sym != end)
+                getsym();
+            if(sym == semicolon)
+            {
+                break;
+            }
+            else if(sym == comma)
+            {
+                getsym();
+            }
+            else if(sym == end)
+                break;
+        }
+        if(sym == semicolon)
+        {
+            getsym();
+            continue;
+        }
+        else if(sym == end)
+        {
+            break;
+        }
+        strcpy(lastid, id);
+        getsym();
+        if(sym == comma || sym == semicolon || sym == lbrack)
+        {
+            variabledec();
+        }
+        else
+        {
+            error(19);
+            while(sym != semicolon && sym != comma && sym != end)
+                getsym();
+            getsym();
+        }
+    }
+    printf("line%d.%d 函数内变量声明处理完毕\n", l, cc);
+    statementlist();//已经读了第一个符号
+    if(sym == rbrace)
+    {
+        printf("line%d.%d 复合语句处理完毕\n", l, cc);
+    }
+    else
+    {
+        error(20);
+    }
+}
+void statementlist()//预读一个
+{
+    printf("line%d.%d 语句列识别开始\n", l, cc);
+    while(sym == ident || sym == ifsy || sym == dosy || sym == forsy || sym == scanfsy
+        || sym == printfsy || sym == returnsy || sym == lbrace || sym == semicolon)
+    {
+        statement();
+        if(sym == rbrace)
+        {
+            break;
+        }
+    }
+    printf("line%d.%d 语句列识别结束\n", l, cc);
+}
+void statement()//预读一个，多读一个
+{
+    if(sym == ident)
+    {
+        strcpy(lastid, id);
+        getsym();
+        if(sym == becomes || sym == lbrack)
+        {
+            assignment();
+            if(sym != semicolon)
+            {
+                error(26);
+            }
+        }
+        else if(sym == lparent)
+        {
+            returnfctstatement();
+            if(sym != semicolon)
+            {
+                error(26);
+            }
+        }
+        else
+        {
+            error(21);
+            while(sym != semicolon && sym != end)
+                getsym();
+        }
+        getsym();
+    }
+    else if(sym == ifsy)
+    {
+        ifstatement();
+    }
+    else if(sym == dosy)
+    {
+        dostatement();
+    }
+    else if(sym == forsy)
+    {
+        forstatement();
+    }
+    else if(sym == scanfsy)
+    {
+        readstatement();
+        if(sym != semicolon)
+        {
+            error(26);
+        }
+        getsym();
+    }
+    else if(sym == printfsy)
+    {
+        writestatement();
+        if(sym != semicolon)
+        {
+            error(26);
+        }
+        getsym();
+    }
+    else if(sym == returnsy)
+    {
+        returnstatement();
+        if(sym != semicolon)
+        {
+            error(26);
+        }
+        getsym();
+    }
+    else if(sym == lbrace)
+    {
+        getsym();
+        statementlist();
+        if(sym == rbrace)
+        {
+            printf("line%d.%d 语句中的语句列处理完毕\n", l, cc);
+        }
+        else
+        {
+            error(20);
+        }
+        getsym();
+    }
+    else if(sym == semicolon)
+    {
+        return;
+    }
+}
+void ifstatement()//预读一个，多读一个
+{
+    getsym();
+    if(sym != lparent)
+    {
+        error(22);
+    }
+    condition();
+    if(sym != rparent)
+    {
+        error(17);
+    }
+    getsym();
+    statement();
+    if(sym == elsesy)
+    {
+        getsym();
+        statement();
+    }
+    printf("line%d.%d if [else]语句分析完成\n", l, cc);
+}
+void dostatement()//预读一个，多读一个
+{
+    getsym();
+    statement();
+    if(sym != whilesy)
+    {
+        error(24);
+    }
+    getsym();
+    if(sym != lparent)
+    {
+        error(22);
+    }
+    condition();
+    if(sym == rparent)
+    {
+        printf("line%d.%d do while语句分析完成\n", l, cc);
+    }
+    else
+    {
+        error(17);
+    }
+    getsym();
+}
+void forstatement()//预读一个，多读一个
+{
+    getsym();
+    if(sym != lparent)
+    {
+        error(22);
+    }
+    getsym();
+    if(sym != ident)
+    {
+        error(10);
+    }
+    getsym();
+    if(sym != becomes)
+    {
+        error(25);
+    }
+    getsym();
+    expression();
+    if(sym != semicolon)
+    {
+        error(26);
+    }
+    condition();
+    if(sym != semicolon)
+    {
+        error(26);
+    }
+    getsym();
+    if(sym != ident)
+    {
+        error(10);
+    }
+    getsym();
+    if(sym != becomes)
+    {
+        error(25);
+    }
+    getsym();
+    if(sym != ident)
+    {
+        error(10);
+    }
+    getsym();
+    if(sym != plus && sym != minus)
+    {
+        error(27);
+    }
+    getsym();
+    if(sym != intcon)
+    {
+        error(8);
+    }
+    getsym();
+    if(sym != rparent)
+    {
+        error(17);
+    }
+    getsym();
+    statement();
+    printf("line%d.%d for语句分析完成\n", l, cc);
+}
+void condition()//没有预读，多读一个
+{
+    getsym();
+    expression();
+    if(sym == eql || sym == neq || sym == gtr
+    || sym == geq || sym == lss || sym == leq)
+    {
+        getsym();
+        expression();
+    }
+    printf("line%d.%d 条件分析完成\n", l, cc);
+}
+void assignment()//预读到=或[，多读一个
+{
+    if(sym == becomes)
+    {
+        getsym();
+        expression();
+    }
+    else if(sym == lbrack)
+    {
+
+        getsym();
+        expression();
+        if(sym != rbrack)
+        {
+            error(15);
+        }
+        getsym();
+        if(sym != becomes)
+        {
+            error(25);
+        }
+        getsym();
+        expression();
+    }
+    printf("line%d.%d 赋值语句分析完成\n", l, cc);
+}
+void readstatement()//预读一个，多读一个
+{
+    getsym();
+    if(sym != lparent)
+    {
+        error(22);
+    }
+    do{
+        getsym();
+        if(sym != ident)
+        {
+            error(10);
+        }
+        getsym();
+    }while(sym == comma);
+    if(sym != rparent)
+    {
+        error(17);
+    }
+    getsym();
+    printf("line%d.%d scanf语句分析完成\n", l, cc);
+}
+void writestatement()//预读一个，多读一个
+{
+    getsym();
+    if(sym != lparent)
+    {
+        error(22);
+    }
+    getsym();
+    if(sym == stringcon)
+    {
+        getsym();
+        if(sym == comma)
+        {
+            getsym();
+            expression();
+            if(sym != rparent)
+            {
+                error(17);
+            }
+            printf("line%d.%d printf语句分析完成\n", l, cc);
+        }
+        else if(sym == rparent)
+        {
+            printf("line%d.%d printf语句分析完成\n", l, cc);
+        }
+        else
+        {
+            error(29);
+        }
+    }
+    else if(sym == plus || sym == minus)
+    {
+        getsym();
+        expression();
+        if(sym != rparent)
+        {
+            error(17);
+        }
+        printf("line%d.%d printf语句分析完成\n", l, cc);
+    }
+    getsym();
+}
+void returnstatement()//预读一个，多读一个
+{
+    getsym();
+    if(sym == lparent)
+    {
+        getsym();
+        expression();
+        if(sym != rparent)
+        {
+            error(17);
+        }
+        getsym();
+    }
+    else if(sym == semicolon)
+    {
+    }
+    else
+    {
+        error(30);
+        getsym();
+    }
+    printf("line%d.%d return语句分析完成\n", l, cc);
+}
+void returnfctstatement()//预读到(
+{
+    valueparalist();
+    if(sym != rparent)
+    {
+        error(17);
+    }
+    getsym();
+    printf("line%d.%d 有返回值函数调用语句分析完成\n", l, cc);
+}
+void noreturnfctstatement();
+void valueparalist()//没有预读，多读一个
+{
+    do{
+        getsym();
+        if(sym == rparent)
+            return;
+        expression();
+    }while(sym == comma);
+}
+void expression()//预读一个，多读一个
+{
+    if(sym == plus || sym == minus)
+    {
+        getsym();
+    }
+    term();
+    while(sym == plus || sym == minus)
+    {
+        getsym();
+        term();
+    }
+    printf("line%d.%d 表达式分析完成\n", l, cc);
+}
+void term()//预读一个，多读一个
+{
+    factor();
+    while(sym == times || sym == div)
+    {
+        getsym();
+        factor();
+    }
+    printf("line%d.%d 项分析完成\n", l, cc);
+}
+void factor()//预读一个，多读一个
+{
+    if(sym == ident)
+    {
+        strcpy(lastid, id);
+        getsym();
+        if(sym == lbrack)
+        {
+            getsym();
+            expression();
+            if(sym == rbrack)
+            {
+                printf("line%d.%d 因子为<标识符>[<表达式>]的形式\n", l, cc);
+            }
+            else
+            {
+                error(15);
+            }
+            getsym();
+        }
+        else if(sym == lparent)
+        {
+            returnfctstatement();
+            printf("line%d.%d 因子为<有返回值函数调用语句>的形式\n", l, cc);
+        }
+        else
+        {
+            printf("line%d.%d 因子为<标识符>的形式\n", l, cc);
+        }
+    }
+    else if(sym == lparent)
+    {
+        getsym();
+        expression();
+        if(sym == rparent)
+        {
+            printf("line%d.%d 因子是(<表达式>)的形式\n", l, cc);
+        }
+        else
+        {
+            error(17);
+        }
+        getsym();
+    }
+    else if(sym == charcon)
+    {
+        printf("line%d.%d 因子是一个字符\n", l, cc);
+        getsym();
+    }
+    else if(sym == plus || sym == minus)
+    {
+        lastsy = sym;
+        getsym();
+        if(sym == intcon)
+        {
+            printf("line%d.%d 因子是一个整数\n", l, cc);
+        }
+        else
+        {
+            error(8);
+        }
+        getsym();
+    }
+    else if(sym == intcon)
+    {
+        printf("line%d.%d 因子是一个整数\n", l, cc);
+        getsym();
+    }
+    else
+    {
+        error(23);
+        //TODO:跳到哪里？？？
+        getsym();
+    }
+}
+
+
 void print(int n)
 {
     printf("%d %s ", n, symbolstr[sym]);
